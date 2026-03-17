@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0055A5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#003070;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="flame" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6B00;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#FFB300;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFE066;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="256" height="256" rx="40" ry="40" fill="url(#bg)" />
+
+  <!-- Flame shape -->
+  <path d="M128 48
+    C128 48 105 72 105 100
+    C105 108 108 115 113 120
+    C110 113 113 104 118 100
+    C118 118 124 125 124 138
+    C124 148 118 155 110 158
+    C115 145 114 136 110 128
+    C106 140 108 158 115 168
+    C105 162 98 150 98 136
+    C98 110 115 88 128 68
+    C141 88 158 110 158 136
+    C158 150 151 162 141 168
+    C148 158 150 140 146 128
+    C142 136 141 145 146 158
+    C138 155 132 148 132 138
+    C132 125 138 118 138 100
+    C143 104 146 113 143 120
+    C148 115 151 108 151 100
+    C151 72 128 48 128 48Z"
+    fill="url(#flame)" opacity="0.95"/>
+
+  <!-- AO text -->
+  <text x="128" y="220"
+    font-family="Arial, sans-serif"
+    font-size="42"
+    font-weight="700"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="3">AO SMITH</text>
+
+  <!-- AiLink small text -->
+  <text x="128" y="244"
+    font-family="Arial, sans-serif"
+    font-size="18"
+    font-weight="400"
+    fill="#7EB8E8"
+    text-anchor="middle"
+    letter-spacing="5">AiLink</text>
+</svg>

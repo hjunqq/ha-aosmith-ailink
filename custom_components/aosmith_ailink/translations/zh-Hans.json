@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AO Smith AiLink",
+        "description": "粘贴 sessions.json 的一条记录，或直接粘贴整个 sessions.json 内容。",
+        "data": {
+          "session_payload": "Session JSON"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "连接失败",
+      "invalid_auth": "会话令牌无效或已过期",
+      "invalid_session_payload": "Session JSON 无效"
+    },
+    "abort": {
+      "already_configured": "这个连接已经配置过了"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AO Smith AiLink",
+        "description": "Paste one session object or the whole sessions.json content.",
+        "data": {
+          "session_payload": "Session JSON"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Session token is invalid or expired",
+      "invalid_session_payload": "Session JSON is invalid"
+    },
+    "abort": {
+      "already_configured": "This connection is already configured"
+    }
+  }
+}
