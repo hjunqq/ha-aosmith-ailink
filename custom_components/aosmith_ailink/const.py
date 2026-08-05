@@ -54,6 +54,15 @@ THERMOSTAT_MODE_TO_HVAC = {
 
 HEAT_CAPABLE_MODES = {1, 3, 4}
 
+# The source plant is shared by every room. Center-controller strategy and
+# room thermostat mode must therefore move together.
+CENTER_HEATING_TO_THERMOSTAT_MODE = {
+    0: 4,  # ECO dual source
+    1: 4,  # Max dual source
+    2: 3,  # Boiler / floor heating
+    3: 1,  # Heat pump / warm air
+}
+
 WIND_RATE_LABELS = {
     0: "自动",
     1: "低",

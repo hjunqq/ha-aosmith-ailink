@@ -23,19 +23,42 @@ Each thermostat in your AiLink family is discovered automatically.
 | Entity type | What it exposes |
 |---|---|
 | `climate` | Power, HVAC mode, preset mode, target temperature, fan speed |
-| `switch` | Per-mode switches (制冷 / 风暖 / 通风 / 地暖 / 双能 / 除湿 / 等温除湿) |
+| `switch` | Per-mode controls and whole-home heating strategies |
 | `fan` | Standalone fan speed control |
 | `select` | Heating mode for center controller (ECO / Max / 单壁挂炉 / 单热泵) |
 | `sensor` | Room temp, target temp, humidity, PM2.5, CO₂, TVOC, formaldehyde |
 | `binary_sensor` | Power state, main thermostat flag |
 
+### Shared HVAC safety
+
+The heat pump, boiler, and cooling source are shared by every room. Room power,
+target temperature, and fan speed remain independent, but the underlying operating
+mode is synchronized across all thermostats. This prevents impossible combinations
+such as one room cooling while another requests boiler or heat-pump heating.
+
+Heating is selected through four mutually exclusive whole-home strategies:
+
+- ECO dual source
+- Max dual source
+- Boiler only / floor heating
+- Heat pump only / warm air
+
+A generic turn-on preserves the active whole-home mode instead of forcing heating.
+When switching to cooling, a stale target above 27°C is normalized to 26°C.
+
 ### HomeKit / Siri
 
-Because HomeKit's thermostat accessory only supports `Heat / Cool / Off`, the **mode switches** are the recommended way to control specific modes via Siri:
+Use a dedicated HomeKit Bridge containing only room thermostats, room fan controls,
+and the four whole-home heating strategy switches. Do not expose the per-room mode
+switches, `select` entities, or diagnostic sensors to HomeKit.
 
-> "Hey Siri, turn on 地暖" / "Hey Siri, turn on 制冷"
+Always include the room, mode, and temperature in a cooling command. For heating,
+select the whole-home source first and then set the required room thermostats to
+heat. Avoid generic commands such as "turn on the air conditioner" because Siri may
+match more than one accessory.
 
-The `climate` entity also remembers the last active heating preset (地暖 / 风暖 / 双能) and restores it automatically when Siri says "turn on the air conditioner".
+See [HomeKit and Siri setup](docs/HOMEKIT_SIRI.md) for the recommended entity filter,
+accessory names, exact Chinese Siri phrases, fan-speed mapping, and safety rules.
 
 ---
 
@@ -99,6 +122,8 @@ Use an HTTP proxy (e.g. mitmproxy, Charles, or HttpCanary) to intercept a reques
 ### Mode Switches (`switch.<room_name>_<mode>`)
 
 Each switch corresponds to one preset mode. Turning a switch **on** powers the device and sets that mode. Turning it **off** powers off the device.
+
+These switches should not be exposed directly to HomeKit / Siri.
 
 ### Sensors
 

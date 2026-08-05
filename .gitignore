@@ -1,4 +1,63 @@
+# Development artifacts
+_backup_*/
+archive/
+.venv/
+jadx-gui-*/
+aosmith-web-dashboard/
+
+# Dev scripts at root (root level only)
+/*.py
+/requirements.txt
+
+# Dev notes and reports
+AOSMITH_DASHBOARD.md
+CLEANED_PROJECT_STRUCTURE.md
+COMPLETE_LOGIN_GUIDE.md
+ENCODE_UPDATE_REPORT.md
+FINAL_FIX_SUMMARY.md
+FINAL_SUMMARY.md
+MANUAL_VERIFICATION_GUIDE.md
+PROJECT_COMPLETION_SUMMARY.md
+RANDSTR_PROBLEM_SOLUTION.md
+SMS_CAPTCHA_500_ERROR_SOLUTION.md
+algorithm_analysis_report.md
+cleanup_analysis_report.md
+
+# Sensitive files
+ha连接信息.md
+*.env
+sessions.json
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+
+# Other dev files at root
+/*.yaml
+/*.har
+/*.zip
+/*.apk
+/*.apk.jadx
+/*.jar
+/*.bat
+/*.txt
+/*.json
+/*.md
+/decompiled/
+/decompiled.zip
+/ailink-api-extracted/
+/ailink-api.chlz
+/h5_dist/
+/h5_index.html
+/AI家智控*/
+/.claude/
+
+# Keep root-level project files
+!README.md
+!LICENSE
+!hacs.json
+
+# OS
 .DS_Store
 Thumbs.db

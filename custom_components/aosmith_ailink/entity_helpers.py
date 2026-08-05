@@ -6,11 +6,65 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import slugify
 
 from .const import (
+    CENTER_HEATING_TO_THERMOSTAT_MODE,
     DOMAIN,
     THERMOSTAT_MODE_LABELS,
     THERMOSTAT_SUPPORT_LABELS,
     WIND_RATE_LABELS,
 )
+
+
+def center_heating_mode_for_thermostat_mode(
+    data: dict[str, Any], thermostat_mode: int
+) -> int | None:
+    if thermostat_mode == 1:
+        return 3
+    if thermostat_mode == 3:
+        return 2
+    if thermostat_mode == 4:
+        current = (data.get("centercontroller") or {}).get("HeatingMode")
+        return current if current in (0, 1) else 0
+    return None
+
+
+def thermostat_mode_for_center_heating(data: dict[str, Any]) -> int:
+    center_mode = (data.get("centercontroller") or {}).get("HeatingMode")
+    return CENTER_HEATING_TO_THERMOSTAT_MODE.get(center_mode, 3)
+
+
+async def async_set_whole_home_mode(
+    coordinator,
+    api,
+    thermostat_mode: int,
+    *,
+    power_device_id: str | None = None,
+    center_heating_mode: int | None = None,
+) -> None:
+    """Apply the shared source mode while preserving room power states."""
+    data = coordinator.data
+    center = data.get("centercontroller") or {}
+    desired_center_mode = center_heating_mode
+    if desired_center_mode is None:
+        desired_center_mode = center_heating_mode_for_thermostat_mode(
+            data, thermostat_mode
+        )
+
+    if (
+        desired_center_mode is not None
+        and center.get("deviceId")
+        and center.get("HeatingMode") != desired_center_mode
+    ):
+        await api.async_set_heating_mode(center["deviceId"], desired_center_mode)
+
+    if power_device_id is not None:
+        await api.async_set_thermostat_power(power_device_id, True)
+
+    for thermostat in data.get("thermostats", []):
+        if thermostat.get("workModelStatus") == thermostat_mode:
+            continue
+        await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
+
+    await coordinator.async_request_refresh()
 
 
 def get_thermostat(data: dict[str, Any], device_id: str) -> dict[str, Any]:

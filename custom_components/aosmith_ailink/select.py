@@ -7,6 +7,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CENTER_HEATING_TO_THERMOSTAT_MODE,
     DOMAIN,
     HEATING_LABEL_TO_MODE,
     HEATING_MODE_LABELS,
@@ -14,6 +15,7 @@ from .const import (
     THERMOSTAT_MODE_LABELS,
 )
 from .entity_helpers import (
+    async_set_whole_home_mode,
     build_center_device_info,
     build_thermostat_device_info,
     center_object_id,
@@ -74,8 +76,13 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
         return center_object_id("heating_mode")
 
     async def async_select_option(self, option: str) -> None:
-        await self.api.async_set_heating_mode(self.device_id, HEATING_LABEL_TO_MODE[option])
-        await self.coordinator.async_request_refresh()
+        center_mode = HEATING_LABEL_TO_MODE[option]
+        await async_set_whole_home_mode(
+            self.coordinator,
+            self.api,
+            CENTER_HEATING_TO_THERMOSTAT_MODE[center_mode],
+            center_heating_mode=center_mode,
+        )
 
 
 class AOSmithThermostatModeSelect(CoordinatorEntity, SelectEntity):
@@ -110,6 +117,9 @@ class AOSmithThermostatModeSelect(CoordinatorEntity, SelectEntity):
         return thermostat_object_id(self.thermostat, self.device_id, "mode")
 
     async def async_select_option(self, option: str) -> None:
-        await self.api.async_set_thermostat_power(self.device_id, True)
-        await self.api.async_set_thermostat_mode(self.device_id, THERMOSTAT_LABEL_TO_MODE[option])
-        await self.coordinator.async_request_refresh()
+        await async_set_whole_home_mode(
+            self.coordinator,
+            self.api,
+            THERMOSTAT_LABEL_TO_MODE[option],
+            power_device_id=self.device_id,
+        )

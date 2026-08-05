@@ -25,12 +25,17 @@ from .const import (
     WIND_RATE_LABELS,
 )
 from .entity_helpers import (
+    async_set_whole_home_mode,
     build_thermostat_device_info,
     decode_half_degree,
     get_thermostat,
     thermostat_object_id,
+    thermostat_mode_for_center_heating,
     thermostat_common_attributes,
 )
+
+
+SAFE_COOLING_TEMPERATURE = 26.0
 
 
 async def async_setup_entry(
@@ -144,9 +149,34 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
         return attrs
 
     async def async_turn_on(self) -> None:
-        await self.api.async_set_thermostat_power(self.device_id, True)
-        await self.api.async_set_thermostat_mode(self.device_id, self._last_heat_mode)
-        await self.coordinator.async_request_refresh()
+        active_modes = [
+            item.get("workModelStatus")
+            for item in self.coordinator.data.get("thermostats", [])
+            if item.get("powerStatus") == 1 and item.get("deviceId") != self.device_id
+        ]
+        mode = active_modes[0] if active_modes else self.thermostat.get("workModelStatus")
+        if mode not in THERMOSTAT_MODE_TO_HVAC:
+            mode = thermostat_mode_for_center_heating(self.coordinator.data)
+
+        await async_set_whole_home_mode(
+            self.coordinator,
+            self.api,
+            mode,
+            power_device_id=self.device_id,
+        )
+
+        # Keep the controller's last mode. HomeKit calls turn_on without a mode,
+        # so forcing heating here can unexpectedly carry a 28 C heating setpoint
+        # into a cooling request.
+        if (
+            self.thermostat.get("workModelStatus") == 0
+            and (target := self.target_temperature) is not None
+            and target > 27
+        ):
+            await self.api.async_set_thermostat_setpoint(
+                self.device_id, SAFE_COOLING_TEMPERATURE
+            )
+            await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self) -> None:
         await self.api.async_set_thermostat_power(self.device_id, False)
@@ -158,26 +188,51 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
             await self.coordinator.async_request_refresh()
             return
 
-        await self.api.async_set_thermostat_power(self.device_id, True)
-
         if hvac_mode == HVACMode.COOL:
-            await self.api.async_set_thermostat_mode(self.device_id, 0)
+            await async_set_whole_home_mode(
+                self.coordinator,
+                self.api,
+                0,
+                power_device_id=self.device_id,
+            )
+            target = self.target_temperature
+            if target is None or target > 27:
+                await self.api.async_set_thermostat_setpoint(
+                    self.device_id, SAFE_COOLING_TEMPERATURE
+                )
         elif hvac_mode == HVACMode.FAN_ONLY:
-            await self.api.async_set_thermostat_mode(self.device_id, 2)
+            await async_set_whole_home_mode(
+                self.coordinator,
+                self.api,
+                2,
+                power_device_id=self.device_id,
+            )
         elif hvac_mode == HVACMode.DRY:
-            await self.api.async_set_thermostat_mode(self.device_id, 5)
+            await async_set_whole_home_mode(
+                self.coordinator,
+                self.api,
+                5,
+                power_device_id=self.device_id,
+            )
         elif hvac_mode == HVACMode.HEAT:
-            current_mode = self.thermostat.get("workModelStatus")
-            target_mode = current_mode if current_mode in HEAT_CAPABLE_MODES else self._last_heat_mode
-            await self.api.async_set_thermostat_mode(self.device_id, target_mode)
+            target_mode = thermostat_mode_for_center_heating(self.coordinator.data)
+            await async_set_whole_home_mode(
+                self.coordinator,
+                self.api,
+                target_mode,
+                power_device_id=self.device_id,
+            )
 
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         mode = THERMOSTAT_LABEL_TO_MODE[preset_mode]
-        await self.api.async_set_thermostat_power(self.device_id, True)
-        await self.api.async_set_thermostat_mode(self.device_id, mode)
-        await self.coordinator.async_request_refresh()
+        await async_set_whole_home_mode(
+            self.coordinator,
+            self.api,
+            mode,
+            power_device_id=self.device_id,
+        )
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         rate = WIND_LABEL_TO_RATE[fan_mode]
