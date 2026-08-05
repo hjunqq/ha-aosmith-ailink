@@ -23,7 +23,7 @@ Each thermostat in your AiLink family is discovered automatically.
 | Entity type | What it exposes |
 |---|---|
 | `climate` | Power, HVAC mode, preset mode, target temperature, fan speed |
-| `switch` | Per-room mode controls for HA internal use |
+| `switch` | Per-room mode controls and a fail-safe whole-home power-off switch |
 | `fan` | Standalone fan speed control |
 | `select` | Exact per-room operating mode |
 | `sensor` | Room data and read-only center-controller heating strategy |
@@ -47,14 +47,18 @@ When switching to cooling, a stale target above 27°C is normalized to 26°C.
 
 ### HomeKit / Siri
 
-Use a dedicated HomeKit Bridge containing only room thermostats and room fan
-controls. Do not expose per-room mode switches, `select` entities, or diagnostic
-sensors to HomeKit.
+Use a dedicated HomeKit Bridge containing room thermostats, room fan controls, and
+the fail-safe whole-home power switch. The master switch can turn every room off,
+but its turn-on action is deliberately disabled. Do not expose per-room mode
+switches, `select` entities, or diagnostic sensors to HomeKit.
 
 Always include the room, mode, and temperature in a command. Heating uses the
 strategy already selected on the original controller; Siri cannot change that
 strategy. Avoid generic commands such as "turn on the air conditioner" because Siri
 may match more than one accessory.
+
+Generic thermostat turn-on and fan-speed commands are blocked when an inactive
+room's stored mode is heating. Heating therefore requires an explicit HEAT command.
 
 See [HomeKit and Siri setup](docs/HOMEKIT_SIRI.md) for the recommended entity filter,
 accessory names, exact Chinese Siri phrases, fan-speed mapping, and safety rules.

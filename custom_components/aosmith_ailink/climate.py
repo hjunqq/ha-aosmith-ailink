@@ -158,6 +158,11 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
         if mode not in THERMOSTAT_MODE_TO_HVAC:
             mode = thermostat_mode_for_center_heating(self.coordinator.data)
 
+        # A generic HomeKit turn-on must never start heating. Heating requires an
+        # explicit HEAT mode command so broad Siri phrases cannot enable it.
+        if THERMOSTAT_MODE_TO_HVAC.get(mode) == HVACMode.HEAT:
+            return
+
         await async_set_whole_home_mode(
             self.coordinator,
             self.api,

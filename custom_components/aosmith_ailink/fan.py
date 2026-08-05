@@ -10,7 +10,7 @@ from homeassistant.util.percentage import (
     percentage_to_ordered_list_item,
 )
 
-from .const import DOMAIN, WIND_RATE_LABELS
+from .const import DOMAIN, HEAT_CAPABLE_MODES, WIND_RATE_LABELS
 from .entity_helpers import (
     build_thermostat_device_info,
     get_thermostat,
@@ -106,6 +106,8 @@ class AOSmithThermostatFanEntity(CoordinatorEntity, FanEntity):
         preset_mode: str | None = None,
         **kwargs,
     ) -> None:
+        if not self.is_on and self.thermostat.get("workModelStatus") in HEAT_CAPABLE_MODES:
+            return
         await self.api.async_set_thermostat_power(self.device_id, True)
         if preset_mode:
             await self.async_set_preset_mode(preset_mode)
@@ -123,13 +125,23 @@ class AOSmithThermostatFanEntity(CoordinatorEntity, FanEntity):
         if percentage <= 0:
             await self.async_turn_off()
             return
-        await self.api.async_set_thermostat_power(self.device_id, True)
         speed_name = percentage_to_ordered_list_item(MANUAL_SPEEDS, percentage)
+        if not self.is_on and self.thermostat.get("workModelStatus") in HEAT_CAPABLE_MODES:
+            await self.api.async_set_thermostat_wind_rate(
+                self.device_id, SPEED_TO_RATE[speed_name]
+            )
+            await self.coordinator.async_request_refresh()
+            return
+        await self.api.async_set_thermostat_power(self.device_id, True)
         await self.api.async_set_thermostat_wind_rate(self.device_id, SPEED_TO_RATE[speed_name])
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         if preset_mode != AUTO_PRESET:
+            return
+        if not self.is_on and self.thermostat.get("workModelStatus") in HEAT_CAPABLE_MODES:
+            await self.api.async_set_thermostat_wind_rate(self.device_id, 0)
+            await self.coordinator.async_request_refresh()
             return
         await self.api.async_set_thermostat_power(self.device_id, True)
         await self.api.async_set_thermostat_wind_rate(self.device_id, 0)

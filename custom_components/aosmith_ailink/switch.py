@@ -15,6 +15,7 @@ from .const import (
 )
 from .entity_helpers import (
     async_set_whole_home_mode,
+    build_center_device_info,
     build_thermostat_device_info,
     get_thermostat,
     thermostat_object_id,
@@ -30,10 +31,56 @@ async def async_setup_entry(
     api = hass.data[DOMAIN][entry.entry_id]["api"]
     thermostats = coordinator.data.get("thermostats", [])
     async_add_entities(
-        AOSmithModeSwitch(coordinator, api, item, label, mode)
-        for item in thermostats
-        for label, mode in THERMOSTAT_LABEL_TO_MODE.items()
+        [
+            *(
+                AOSmithModeSwitch(coordinator, api, item, label, mode)
+                for item in thermostats
+                for label, mode in THERMOSTAT_LABEL_TO_MODE.items()
+            ),
+            AOSmithWholeHomePowerSwitch(coordinator, api),
+        ]
     )
+
+
+class AOSmithWholeHomePowerSwitch(CoordinatorEntity, SwitchEntity):
+    """Fail-safe master switch whose only active operation is turn off."""
+
+    _attr_has_entity_name = False
+    _attr_name = "全屋温控总开关"
+    _attr_unique_id = "aosmith_whole_home_power"
+
+    def __init__(self, coordinator, api) -> None:
+        super().__init__(coordinator)
+        self.api = api
+
+    @property
+    def available(self) -> bool:
+        return bool(self.coordinator.data.get("thermostats"))
+
+    @property
+    def is_on(self) -> bool:
+        return any(
+            thermostat.get("powerStatus") == 1
+            for thermostat in self.coordinator.data.get("thermostats", [])
+        )
+
+    @property
+    def suggested_object_id(self) -> str:
+        return "ao_smith_whole_home_power"
+
+    @property
+    def device_info(self):
+        center = self.coordinator.data.get("centercontroller") or {}
+        return build_center_device_info(center) if center else None
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        # A master start is intentionally unsupported: the room and mode must be explicit.
+        return
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        for thermostat in self.coordinator.data.get("thermostats", []):
+            await self.api.async_set_thermostat_power(thermostat["deviceId"], False)
+        await self.coordinator.async_request_refresh()
 
 
 class AOSmithModeSwitch(CoordinatorEntity, SwitchEntity):
