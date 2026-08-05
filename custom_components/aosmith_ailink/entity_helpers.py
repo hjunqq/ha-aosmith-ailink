@@ -8,6 +8,7 @@ from homeassistant.util import slugify
 from .const import (
     CENTER_HEATING_TO_THERMOSTAT_MODE,
     DOMAIN,
+    HEAT_CAPABLE_MODES,
     THERMOSTAT_MODE_LABELS,
     THERMOSTAT_SUPPORT_LABELS,
     WIND_RATE_LABELS,
@@ -40,7 +41,7 @@ async def async_set_whole_home_mode(
     power_device_id: str | None = None,
     center_heating_mode: int | None = None,
 ) -> None:
-    """Apply the shared source mode while preserving room power states."""
+    """Apply a shared mode to active rooms without changing inactive rooms."""
     data = coordinator.data
     center = data.get("centercontroller") or {}
     desired_center_mode = center_heating_mode
@@ -60,7 +61,36 @@ async def async_set_whole_home_mode(
         await api.async_set_thermostat_power(power_device_id, True)
 
     for thermostat in data.get("thermostats", []):
+        is_target = thermostat.get("deviceId") == power_device_id
+        if not is_target and thermostat.get("powerStatus") != 1:
+            continue
         if thermostat.get("workModelStatus") == thermostat_mode:
+            continue
+        await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
+
+    await coordinator.async_request_refresh()
+
+
+async def async_set_whole_home_heating_strategy(
+    coordinator,
+    api,
+    center_heating_mode: int,
+    thermostat_mode: int,
+) -> None:
+    """Select a heat source without converting active cooling rooms to heat."""
+    data = coordinator.data
+    center = data.get("centercontroller") or {}
+    if (
+        center.get("deviceId")
+        and center.get("HeatingMode") != center_heating_mode
+    ):
+        await api.async_set_heating_mode(center["deviceId"], center_heating_mode)
+
+    for thermostat in data.get("thermostats", []):
+        current_mode = thermostat.get("workModelStatus")
+        if thermostat.get("powerStatus") != 1 or current_mode not in HEAT_CAPABLE_MODES:
+            continue
+        if current_mode == thermostat_mode:
             continue
         await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
 

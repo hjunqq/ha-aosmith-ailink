@@ -33,7 +33,8 @@ Each thermostat in your AiLink family is discovered automatically.
 
 The heat pump, boiler, and cooling source are shared by every room. Room power,
 target temperature, and fan speed remain independent, but the underlying operating
-mode is synchronized across all thermostats. This prevents impossible combinations
+mode is synchronized across active thermostats. Inactive rooms keep their previous
+mode. This prevents impossible combinations
 such as one room cooling while another requests boiler or heat-pump heating.
 
 Heating is selected through four mutually exclusive whole-home strategies:
@@ -42,6 +43,9 @@ Heating is selected through four mutually exclusive whole-home strategies:
 - Max dual source
 - Boiler only / floor heating
 - Heat pump only / warm air
+
+Selecting a heating strategy updates the source controller and active heating rooms
+only. It does not turn on inactive rooms or convert active cooling rooms to heat.
 
 A generic turn-on preserves the active whole-home mode instead of forcing heating.
 When switching to cooling, a stale target above 27°C is normalized to 26°C.

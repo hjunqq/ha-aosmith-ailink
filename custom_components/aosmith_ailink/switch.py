@@ -17,6 +17,7 @@ from .const import (
 )
 from .entity_helpers import (
     async_set_whole_home_mode,
+    async_set_whole_home_heating_strategy,
     build_center_device_info,
     build_thermostat_device_info,
     get_thermostat,
@@ -107,11 +108,11 @@ class AOSmithWholeHomeHeatingSwitch(CoordinatorEntity, SwitchEntity):
         return self.center.get("HeatingMode") == self._center_mode
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await async_set_whole_home_mode(
+        await async_set_whole_home_heating_strategy(
             self.coordinator,
             self.api,
+            self._center_mode,
             self._thermostat_mode,
-            center_heating_mode=self._center_mode,
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:

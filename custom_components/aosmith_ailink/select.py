@@ -16,6 +16,7 @@ from .const import (
 )
 from .entity_helpers import (
     async_set_whole_home_mode,
+    async_set_whole_home_heating_strategy,
     build_center_device_info,
     build_thermostat_device_info,
     center_object_id,
@@ -77,11 +78,11 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         center_mode = HEATING_LABEL_TO_MODE[option]
-        await async_set_whole_home_mode(
+        await async_set_whole_home_heating_strategy(
             self.coordinator,
             self.api,
+            center_mode,
             CENTER_HEATING_TO_THERMOSTAT_MODE[center_mode],
-            center_heating_mode=center_mode,
         )
 
 
