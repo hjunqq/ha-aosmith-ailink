@@ -18,7 +18,6 @@ from .entity_helpers import (
     build_center_device_info,
     center_object_id,
     get_main_thermostat,
-    system_is_heating,
     system_mode_code,
 )
 
@@ -85,7 +84,7 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        return bool(self.center) and system_is_heating(self.coordinator.data)
+        return bool(self.center)
 
     @property
     def current_option(self) -> str | None:
@@ -100,8 +99,9 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
         return center_object_id("heating_mode")
 
     async def async_select_option(self, option: str) -> None:
-        if not system_is_heating(self.coordinator.data):
-            return
+        # This only stores the second-level heating strategy. It does not change
+        # the whole-home mode or power on any room, so it is safe to preset while
+        # the system is cooling.
         await self.api.async_set_heating_mode(
             self.center["deviceId"], HEATING_LABEL_TO_MODE[option]
         )

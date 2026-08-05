@@ -37,8 +37,9 @@ selects ECO, Max, boiler only, or heat pump only.
 
 The integration follows that model directly. Only the main thermostat receives the
 whole-home `SetThermostatModel(0/1)` command. `HeatingModeSet(0..3)` is a separate
-HA-only select that is available while heating. Room power, target temperature, and
-fan speed remain independent.
+HA-only select that can safely preset the next heating strategy without changing the
+whole-home mode or powering on a room. Room power, target temperature, and fan speed
+remain independent.
 
 A generic turn-on is allowed only while the system is already cooling. When
 switching to cooling, a stale target above 27°C is normalized to 26°C.
@@ -128,7 +129,7 @@ turns on only the requested room.
 | Entity | Purpose |
 |---|---|
 | `select.ao_smith_system_mode` | Whole-home cooling or heating |
-| `select.ao_smith_center_controller_heating_mode` | ECO, Max, boiler only, or heat pump only; available only while heating |
+| `select.ao_smith_center_controller_heating_mode` | ECO, Max, boiler only, or heat pump only; can be preset while cooling |
 
 Changing either select does not turn on a room. The fail-safe
 `switch.ao_smith_whole_home_power` can turn all room thermostats off, but its

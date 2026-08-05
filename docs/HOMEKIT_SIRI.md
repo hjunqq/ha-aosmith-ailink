@@ -7,7 +7,7 @@ AO Smith 使用两层控制：第一层是全屋制冷或采暖；第二层仅�
 集成严格复现原 AiLink H5：
 
 - `select.ao_smith_system_mode` 通过客厅主温控切换全屋制冷/采暖
-- `select.ao_smith_center_controller_heating_mode` 只在全屋采暖时选择四种采暖方式
+- `select.ao_smith_center_controller_heating_mode` 可随时预选四种采暖方式，但只写入策略，不切换全屋模式，也不启动房间
 - 四个房间不再提供独立冷暖模式选择，只保留开关、温度和风速
 - HomeKit 不暴露两个 `select`，避免 Siri 误触采暖方式
 
