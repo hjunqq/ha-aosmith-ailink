@@ -12,26 +12,22 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
     HEAT_CAPABLE_MODES,
-    THERMOSTAT_LABEL_TO_MODE,
-    THERMOSTAT_MODE_LABELS,
-    THERMOSTAT_MODE_TO_HVAC,
     WIND_LABEL_TO_RATE,
     WIND_RATE_LABELS,
 )
 from .entity_helpers import (
-    async_set_whole_home_mode,
+    async_set_system_mode,
     build_thermostat_device_info,
     decode_half_degree,
     get_thermostat,
-    thermostat_object_id,
-    thermostat_mode_for_center_heating,
+    system_thermostat_mode,
     thermostat_common_attributes,
+    thermostat_object_id,
 )
 
 
@@ -44,19 +40,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    thermostats = coordinator.data.get("thermostats", [])
+    api = hass.data[DOMAIN][entry.entry_id]["api"]
     async_add_entities(
-        AOSmithThermostatEntity(coordinator, hass.data[DOMAIN][entry.entry_id]["api"], item)
-        for item in thermostats
+        AOSmithThermostatEntity(coordinator, api, thermostat)
+        for thermostat in coordinator.data.get("thermostats", [])
     )
 
 
-class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
+class AOSmithThermostatEntity(CoordinatorEntity, ClimateEntity):
     _attr_has_entity_name = True
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
-    if hasattr(ClimateEntityFeature, "PRESET_MODE"):
-        _attr_supported_features |= ClimateEntityFeature.PRESET_MODE
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
+    )
     if hasattr(ClimateEntityFeature, "TURN_ON"):
         _attr_supported_features |= ClimateEntityFeature.TURN_ON
     if hasattr(ClimateEntityFeature, "TURN_OFF"):
@@ -64,9 +60,8 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
     _attr_target_temperature_step = 0.5
     _attr_min_temp = 16
     _attr_max_temp = 30
-    _attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL, HVACMode.HEAT, HVACMode.FAN_ONLY, HVACMode.DRY]
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.COOL, HVACMode.HEAT]
     _attr_fan_modes = list(WIND_LABEL_TO_RATE.keys())
-    _attr_preset_modes = list(THERMOSTAT_LABEL_TO_MODE.keys())
 
     def __init__(self, coordinator, api, thermostat: dict[str, Any]) -> None:
         super().__init__(coordinator)
@@ -74,14 +69,6 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
         self.device_id = thermostat["deviceId"]
         self._attr_unique_id = self.device_id
         self._attr_name = None
-        self._last_heat_mode: int = 3  # 默认地暖
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        if (last_state := await self.async_get_last_state()) and last_state.attributes.get("preset_mode"):
-            preset = last_state.attributes["preset_mode"]
-            if preset in THERMOSTAT_LABEL_TO_MODE and THERMOSTAT_LABEL_TO_MODE[preset] in HEAT_CAPABLE_MODES:
-                self._last_heat_mode = THERMOSTAT_LABEL_TO_MODE[preset]
 
     @property
     def thermostat(self) -> dict[str, Any]:
@@ -114,68 +101,45 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
     def hvac_mode(self) -> HVACMode:
         if self.thermostat.get("powerStatus") != 1:
             return HVACMode.OFF
-        mode = self.thermostat.get("workModelStatus")
-        return THERMOSTAT_MODE_TO_HVAC.get(mode, HVACMode.HEAT)
+        system_mode = system_thermostat_mode(self.coordinator.data)
+        if system_mode == 0:
+            return HVACMode.COOL
+        if system_mode in HEAT_CAPABLE_MODES:
+            return HVACMode.HEAT
+        return HVACMode.OFF
 
     @property
     def hvac_action(self) -> HVACAction:
-        if self.thermostat.get("powerStatus") != 1:
-            return HVACAction.OFF
-        hvac_mode = self.hvac_mode
-        if hvac_mode == HVACMode.COOL:
+        if self.hvac_mode == HVACMode.COOL:
             return HVACAction.COOLING
-        if hvac_mode == HVACMode.DRY:
-            return HVACAction.DRYING
-        if hvac_mode == HVACMode.FAN_ONLY:
-            return HVACAction.FAN
-        return HVACAction.HEATING
-
-    @property
-    def preset_mode(self) -> str | None:
-        mode = self.thermostat.get("workModelStatus")
-        if mode in HEAT_CAPABLE_MODES and self.thermostat.get("powerStatus") == 1:
-            self._last_heat_mode = mode
-        return THERMOSTAT_MODE_LABELS.get(mode)
+        if self.hvac_mode == HVACMode.HEAT:
+            return HVACAction.HEATING
+        return HVACAction.OFF
 
     @property
     def fan_mode(self) -> str | None:
-        rate = self.thermostat.get("windModelStatus")
-        return WIND_RATE_LABELS.get(rate)
+        return WIND_RATE_LABELS.get(self.thermostat.get("windModelStatus"))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         attrs = thermostat_common_attributes(self.thermostat)
         attrs["power_status"] = self.thermostat.get("powerStatus")
+        attrs["system_mode_status"] = system_thermostat_mode(self.coordinator.data)
         return attrs
 
     async def async_turn_on(self) -> None:
-        active_modes = [
-            item.get("workModelStatus")
-            for item in self.coordinator.data.get("thermostats", [])
-            if item.get("powerStatus") == 1 and item.get("deviceId") != self.device_id
-        ]
-        mode = active_modes[0] if active_modes else self.thermostat.get("workModelStatus")
-        if mode not in THERMOSTAT_MODE_TO_HVAC:
-            mode = thermostat_mode_for_center_heating(self.coordinator.data)
-
-        # A generic HomeKit turn-on must never start heating. Heating requires an
-        # explicit HEAT mode command so broad Siri phrases cannot enable it.
-        if THERMOSTAT_MODE_TO_HVAC.get(mode) == HVACMode.HEAT:
+        # Generic HomeKit turn-on is allowed only while the whole-home system is
+        # already cooling. Heating always requires an explicit HEAT command.
+        if system_thermostat_mode(self.coordinator.data) != 0:
             return
-
-        await async_set_whole_home_mode(
+        await async_set_system_mode(
             self.coordinator,
             self.api,
-            mode,
+            0,
             power_device_id=self.device_id,
         )
-
-        # Keep the controller's last mode. HomeKit calls turn_on without a mode,
-        # so forcing heating here can unexpectedly carry a 28 C heating setpoint
-        # into a cooling request.
         if (
-            self.thermostat.get("workModelStatus") == 0
-            and (target := self.target_temperature) is not None
+            (target := self.target_temperature) is not None
             and target > 27
         ):
             await self.api.async_set_thermostat_setpoint(
@@ -189,59 +153,35 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:
-            await self.api.async_set_thermostat_power(self.device_id, False)
-            await self.coordinator.async_request_refresh()
+            await self.async_turn_off()
             return
 
         if hvac_mode == HVACMode.COOL:
-            await async_set_whole_home_mode(
+            await async_set_system_mode(
                 self.coordinator,
                 self.api,
                 0,
                 power_device_id=self.device_id,
             )
-            target = self.target_temperature
-            if target is None or target > 27:
+            if self.target_temperature is None or self.target_temperature > 27:
                 await self.api.async_set_thermostat_setpoint(
                     self.device_id, SAFE_COOLING_TEMPERATURE
                 )
-        elif hvac_mode == HVACMode.FAN_ONLY:
-            await async_set_whole_home_mode(
-                self.coordinator,
-                self.api,
-                2,
-                power_device_id=self.device_id,
-            )
-        elif hvac_mode == HVACMode.DRY:
-            await async_set_whole_home_mode(
-                self.coordinator,
-                self.api,
-                5,
-                power_device_id=self.device_id,
-            )
-        elif hvac_mode == HVACMode.HEAT:
-            target_mode = thermostat_mode_for_center_heating(self.coordinator.data)
-            await async_set_whole_home_mode(
-                self.coordinator,
-                self.api,
-                target_mode,
-                power_device_id=self.device_id,
-            )
+                await self.coordinator.async_request_refresh()
+            return
 
-        await self.coordinator.async_request_refresh()
-
-    async def async_set_preset_mode(self, preset_mode: str) -> None:
-        mode = THERMOSTAT_LABEL_TO_MODE[preset_mode]
-        await async_set_whole_home_mode(
-            self.coordinator,
-            self.api,
-            mode,
-            power_device_id=self.device_id,
-        )
+        if hvac_mode == HVACMode.HEAT:
+            await async_set_system_mode(
+                self.coordinator,
+                self.api,
+                1,
+                power_device_id=self.device_id,
+            )
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        rate = WIND_LABEL_TO_RATE[fan_mode]
-        await self.api.async_set_thermostat_wind_rate(self.device_id, rate)
+        await self.api.async_set_thermostat_wind_rate(
+            self.device_id, WIND_LABEL_TO_RATE[fan_mode]
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -251,5 +191,7 @@ class AOSmithThermostatEntity(CoordinatorEntity, RestoreEntity, ClimateEntity):
 
         temperature = kwargs.get("temperature")
         if temperature is not None:
-            await self.api.async_set_thermostat_setpoint(self.device_id, float(temperature))
+            await self.api.async_set_thermostat_setpoint(
+                self.device_id, float(temperature)
+            )
             await self.coordinator.async_request_refresh()

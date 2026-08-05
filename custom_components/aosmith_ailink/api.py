@@ -301,6 +301,15 @@ class AOSmithDirectClient:
             input_data={"CommandValue": str(rate)},
         )
 
+    async def async_set_heating_mode(self, device_id: str, mode: int) -> None:
+        await self._invoke_method(
+            device_id=device_id,
+            product_type="37",
+            device_type="37",
+            identifier="HeatingModeSet",
+            input_data={"CommandValue": str(mode)},
+        )
+
     async def _invoke_method(
         self,
         *,

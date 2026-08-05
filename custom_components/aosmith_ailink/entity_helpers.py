@@ -6,39 +6,66 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import slugify
 
 from .const import (
-    CENTER_HEATING_TO_THERMOSTAT_MODE,
     DOMAIN,
+    HEAT_CAPABLE_MODES,
     THERMOSTAT_MODE_LABELS,
     THERMOSTAT_SUPPORT_LABELS,
     WIND_RATE_LABELS,
 )
 
 
-def thermostat_mode_for_center_heating(data: dict[str, Any]) -> int:
-    center_mode = (data.get("centercontroller") or {}).get("HeatingMode")
-    return CENTER_HEATING_TO_THERMOSTAT_MODE.get(center_mode, 3)
+def get_main_thermostat(data: dict[str, Any]) -> dict[str, Any]:
+    main = data.get("mainThermostat") or {}
+    if main:
+        return main
+    for thermostat in data.get("thermostats", []):
+        if thermostat.get("mainWenKongFlag") == 1:
+            return thermostat
+    return {}
 
 
-async def async_set_whole_home_mode(
+def system_thermostat_mode(data: dict[str, Any]) -> int | None:
+    return get_main_thermostat(data).get("workModelStatus")
+
+
+def system_is_heating(data: dict[str, Any]) -> bool:
+    return system_thermostat_mode(data) in HEAT_CAPABLE_MODES
+
+
+def system_mode_code(data: dict[str, Any]) -> int | None:
+    """Return the normalized whole-home mode: 0 cooling or 1 heating."""
+    mode = system_thermostat_mode(data)
+    if mode == 0:
+        return 0
+    if mode in HEAT_CAPABLE_MODES:
+        return 1
+    return None
+
+
+async def async_set_system_mode(
     coordinator,
     api,
     thermostat_mode: int,
     *,
     power_device_id: str | None = None,
 ) -> None:
-    """Apply a shared mode to active rooms without changing inactive rooms."""
+    """Set the whole-home mode through the main thermostat, matching AiLink H5."""
     data = coordinator.data
+    main = get_main_thermostat(data)
+    if not main.get("deviceId"):
+        raise RuntimeError("AO Smith main thermostat is unavailable")
+
+    if thermostat_mode not in (0, 1):
+        raise ValueError(f"Unsupported whole-home mode: {thermostat_mode}")
+
+    # Heating can be reported as raw mode 1, 3, or 4. They are all the same
+    # first-level system mode and must not be rewritten, or the selected heating
+    # strategy could be disturbed.
+    if system_mode_code(data) != thermostat_mode:
+        await api.async_set_thermostat_mode(main["deviceId"], thermostat_mode)
 
     if power_device_id is not None:
         await api.async_set_thermostat_power(power_device_id, True)
-
-    for thermostat in data.get("thermostats", []):
-        is_target = thermostat.get("deviceId") == power_device_id
-        if not is_target and thermostat.get("powerStatus") != 1:
-            continue
-        if thermostat.get("workModelStatus") == thermostat_mode:
-            continue
-        await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
 
     await coordinator.async_request_refresh()
 

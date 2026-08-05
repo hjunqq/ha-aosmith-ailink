@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from homeassistant.components.climate.const import HVACMode
 from homeassistant.const import Platform
 
 DOMAIN = "aosmith_ailink"
@@ -32,6 +31,11 @@ HEATING_MODE_LABELS = {
     3: "单热泵空调采暖",
 }
 
+SYSTEM_MODE_LABELS = {
+    0: "制冷",
+    1: "采暖",
+}
+
 THERMOSTAT_MODE_LABELS = {
     0: "制冷",
     1: "风暖",
@@ -42,26 +46,7 @@ THERMOSTAT_MODE_LABELS = {
     6: "等温除湿",
 }
 
-THERMOSTAT_MODE_TO_HVAC = {
-    0: HVACMode.COOL,
-    1: HVACMode.HEAT,
-    2: HVACMode.FAN_ONLY,
-    3: HVACMode.HEAT,
-    4: HVACMode.HEAT,
-    5: HVACMode.DRY,
-    6: HVACMode.DRY,
-}
-
 HEAT_CAPABLE_MODES = {1, 3, 4}
-
-# The source plant is shared by every room. Center-controller strategy and
-# room thermostat mode must therefore move together.
-CENTER_HEATING_TO_THERMOSTAT_MODE = {
-    0: 4,  # ECO dual source
-    1: 4,  # Max dual source
-    2: 3,  # Boiler / floor heating
-    3: 1,  # Heat pump / warm air
-}
 
 WIND_RATE_LABELS = {
     0: "自动",
@@ -83,5 +68,5 @@ THERMOSTAT_SUPPORT_LABELS = {
 }
 
 WIND_LABEL_TO_RATE = {label: rate for rate, label in WIND_RATE_LABELS.items()}
-THERMOSTAT_LABEL_TO_MODE = {label: mode for mode, label in THERMOSTAT_MODE_LABELS.items()}
 HEATING_LABEL_TO_MODE = {label: mode for mode, label in HEATING_MODE_LABELS.items()}
+SYSTEM_LABEL_TO_MODE = {label: mode for mode, label in SYSTEM_MODE_LABELS.items()}
