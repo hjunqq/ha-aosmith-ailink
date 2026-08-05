@@ -1,7 +1,7 @@
 {
   "domain": "aosmith_ailink",
   "name": "AO Smith AiLink",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "config_flow": true,
   "integration_type": "hub",
   "iot_class": "cloud_polling"

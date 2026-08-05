@@ -8,24 +8,10 @@ from homeassistant.util import slugify
 from .const import (
     CENTER_HEATING_TO_THERMOSTAT_MODE,
     DOMAIN,
-    HEAT_CAPABLE_MODES,
     THERMOSTAT_MODE_LABELS,
     THERMOSTAT_SUPPORT_LABELS,
     WIND_RATE_LABELS,
 )
-
-
-def center_heating_mode_for_thermostat_mode(
-    data: dict[str, Any], thermostat_mode: int
-) -> int | None:
-    if thermostat_mode == 1:
-        return 3
-    if thermostat_mode == 3:
-        return 2
-    if thermostat_mode == 4:
-        current = (data.get("centercontroller") or {}).get("HeatingMode")
-        return current if current in (0, 1) else 0
-    return None
 
 
 def thermostat_mode_for_center_heating(data: dict[str, Any]) -> int:
@@ -39,23 +25,9 @@ async def async_set_whole_home_mode(
     thermostat_mode: int,
     *,
     power_device_id: str | None = None,
-    center_heating_mode: int | None = None,
 ) -> None:
     """Apply a shared mode to active rooms without changing inactive rooms."""
     data = coordinator.data
-    center = data.get("centercontroller") or {}
-    desired_center_mode = center_heating_mode
-    if desired_center_mode is None:
-        desired_center_mode = center_heating_mode_for_thermostat_mode(
-            data, thermostat_mode
-        )
-
-    if (
-        desired_center_mode is not None
-        and center.get("deviceId")
-        and center.get("HeatingMode") != desired_center_mode
-    ):
-        await api.async_set_heating_mode(center["deviceId"], desired_center_mode)
 
     if power_device_id is not None:
         await api.async_set_thermostat_power(power_device_id, True)
@@ -65,32 +37,6 @@ async def async_set_whole_home_mode(
         if not is_target and thermostat.get("powerStatus") != 1:
             continue
         if thermostat.get("workModelStatus") == thermostat_mode:
-            continue
-        await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
-
-    await coordinator.async_request_refresh()
-
-
-async def async_set_whole_home_heating_strategy(
-    coordinator,
-    api,
-    center_heating_mode: int,
-    thermostat_mode: int,
-) -> None:
-    """Select a heat source without converting active cooling rooms to heat."""
-    data = coordinator.data
-    center = data.get("centercontroller") or {}
-    if (
-        center.get("deviceId")
-        and center.get("HeatingMode") != center_heating_mode
-    ):
-        await api.async_set_heating_mode(center["deviceId"], center_heating_mode)
-
-    for thermostat in data.get("thermostats", []):
-        current_mode = thermostat.get("workModelStatus")
-        if thermostat.get("powerStatus") != 1 or current_mode not in HEAT_CAPABLE_MODES:
-            continue
-        if current_mode == thermostat_mode:
             continue
         await api.async_set_thermostat_mode(thermostat["deviceId"], thermostat_mode)
 

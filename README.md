@@ -23,10 +23,10 @@ Each thermostat in your AiLink family is discovered automatically.
 | Entity type | What it exposes |
 |---|---|
 | `climate` | Power, HVAC mode, preset mode, target temperature, fan speed |
-| `switch` | Per-mode controls and whole-home heating strategies |
+| `switch` | Per-room mode controls for HA internal use |
 | `fan` | Standalone fan speed control |
-| `select` | Heating mode for center controller (ECO / Max / 单壁挂炉 / 单热泵) |
-| `sensor` | Room temp, target temp, humidity, PM2.5, CO₂, TVOC, formaldehyde |
+| `select` | Exact per-room operating mode |
+| `sensor` | Room data and read-only center-controller heating strategy |
 | `binary_sensor` | Power state, main thermostat flag |
 
 ### Shared HVAC safety
@@ -34,32 +34,27 @@ Each thermostat in your AiLink family is discovered automatically.
 The heat pump, boiler, and cooling source are shared by every room. Room power,
 target temperature, and fan speed remain independent, but the underlying operating
 mode is synchronized across active thermostats. Inactive rooms keep their previous
-mode. This prevents impossible combinations
-such as one room cooling while another requests boiler or heat-pump heating.
+mode. This prevents impossible combinations such as one active room cooling while
+another active room requests heating.
 
-Heating is selected through four mutually exclusive whole-home strategies:
-
-- ECO dual source
-- Max dual source
-- Boiler only / floor heating
-- Heat pump only / warm air
-
-Selecting a heating strategy updates the source controller and active heating rooms
-only. It does not turn on inactive rooms or convert active cooling rooms to heat.
+The center-controller heating strategy is deliberately read-only. The integration
+does not expose or call `HeatingModeSet`; heat-source policy must be managed by the
+original controller or official app. The current strategy remains available as a
+sensor for dashboards and diagnostics.
 
 A generic turn-on preserves the active whole-home mode instead of forcing heating.
 When switching to cooling, a stale target above 27°C is normalized to 26°C.
 
 ### HomeKit / Siri
 
-Use a dedicated HomeKit Bridge containing only room thermostats, room fan controls,
-and the four whole-home heating strategy switches. Do not expose the per-room mode
-switches, `select` entities, or diagnostic sensors to HomeKit.
+Use a dedicated HomeKit Bridge containing only room thermostats and room fan
+controls. Do not expose per-room mode switches, `select` entities, or diagnostic
+sensors to HomeKit.
 
-Always include the room, mode, and temperature in a cooling command. For heating,
-select the whole-home source first and then set the required room thermostats to
-heat. Avoid generic commands such as "turn on the air conditioner" because Siri may
-match more than one accessory.
+Always include the room, mode, and temperature in a command. Heating uses the
+strategy already selected on the original controller; Siri cannot change that
+strategy. Avoid generic commands such as "turn on the air conditioner" because Siri
+may match more than one accessory.
 
 See [HomeKit and Siri setup](docs/HOMEKIT_SIRI.md) for the recommended entity filter,
 accessory names, exact Chinese Siri phrases, fan-speed mapping, and safety rules.
