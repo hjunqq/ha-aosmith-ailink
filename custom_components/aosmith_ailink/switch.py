@@ -58,6 +58,4 @@ class AOSmithWholeHomePowerSwitch(CoordinatorEntity, SwitchEntity):
         return
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        for thermostat in self.coordinator.data.get("thermostats", []):
-            await self.api.async_set_thermostat_power(thermostat["deviceId"], False)
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_stop_system()

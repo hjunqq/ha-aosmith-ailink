@@ -22,27 +22,24 @@ Each thermostat in your AiLink family is discovered automatically.
 
 | Entity type | What it exposes |
 |---|---|
-| `climate` | Room power, whole-home HVAC mode, target temperature, fan speed |
+| `climate` | Room power, target temperature, fan speed, and room heating method |
 | `switch` | Fail-safe whole-home power-off switch |
 | `fan` | Standalone fan speed control |
-| `select` | Whole-home cooling/heating mode and four heating strategies |
+| `select` | Whole-home stop/cooling/heating and heating-source strategy |
 | `sensor` | Room data and center-controller heating strategy status |
 | `binary_sensor` | Power state, main thermostat flag |
 
 ### Shared HVAC safety
 
-The original AiLink H5 uses a two-level model. The main thermostat first selects the
-whole-home system mode: cooling or heating. While heating, the center controller
-selects ECO, Max, boiler only, or heat pump only.
+The whole-home selector owns cooling and heating. A changeover stops all rooms
+and requires idle feedback from the boiler and heat pump before writing the new
+mode. A failed check leaves room starts blocked. Installations without that
+feedback can select the season on the original controller and resume the
+confirmed mode in HA.
 
-The integration follows that model directly. Only the main thermostat receives the
-whole-home `SetThermostatModel(0/1)` command. `HeatingModeSet(0..3)` is a separate
-HA-only select that can safely preset the next heating strategy without changing the
-whole-home mode or powering on a room. Room power, target temperature, and fan speed
-remain independent.
-
-A generic turn-on is allowed only while the system is already cooling. When
-switching to cooling, a stale target above 27°C is normalized to 26°C.
+The center-controller strategy can be changed only during whole-home heating.
+Room thermostats can select floor or warm-air heating in that same season.
+Room commands that conflict with the current whole-home mode are rejected.
 
 ### HomeKit / Siri
 
@@ -51,13 +48,9 @@ the fail-safe whole-home power switch. The master switch can turn every room off
 but its turn-on action is deliberately disabled. Do not expose per-room mode
 switches, `select` entities, or diagnostic sensors to HomeKit.
 
-Always include the room, mode, and temperature in a command. Setting a room to heat
-changes the whole-home system mode through the main thermostat but keeps the current
-heating strategy. Siri cannot change that strategy because the strategy select is
-not exposed to HomeKit. Avoid generic commands such as "turn on the air conditioner".
-
-Generic thermostat turn-on and fan-speed commands are blocked while the whole-home
-system is heating. Heating therefore requires an explicit HEAT command.
+The optional [HomeKit room scripts](docs/examples/aosmith_homekit_room_scripts.yaml)
+provide a room comfort command for both seasons and room-specific floor and
+warm-air commands. A fan adjustment requires its room to be on.
 
 See [HomeKit and Siri setup](docs/HOMEKIT_SIRI.md) for the recommended entity filter,
 accessory names, exact Chinese Siri phrases, fan-speed mapping, and safety rules.
@@ -128,8 +121,8 @@ turns on only the requested room.
 
 | Entity | Purpose |
 |---|---|
-| `select.ao_smith_system_mode` | Whole-home cooling or heating |
-| `select.ao_smith_center_controller_heating_mode` | ECO, Max, boiler only, or heat pump only; can be preset while cooling |
+| `select.ao_smith_system_mode` | Whole-home stop, cooling, or heating |
+| `select.ao_smith_center_controller_heating_mode` | ECO, Max, boiler only, or heat pump only during heating |
 
 Changing either select does not turn on a room. The fail-safe
 `switch.ao_smith_whole_home_power` can turn all room thermostats off, but its

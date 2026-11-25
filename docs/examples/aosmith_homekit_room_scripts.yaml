@@ -1,0 +1,131 @@
+ao_smith_comfort_ke_ting:
+  alias: 客厅舒适模式
+  icon: mdi:home-thermometer
+  sequence:
+    - action: script.ao_smith_room_comfort
+      data:
+        room: climate.ke_ting
+        cooling_temperature: 26
+        heating_temperature: 22
+
+ao_smith_floor_ke_ting:
+  alias: 客厅切到地暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.ke_ting
+      data:
+        preset_mode: 地暖
+
+ao_smith_air_ke_ting:
+  alias: 客厅切到风暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.ke_ting
+      data:
+        preset_mode: 风暖
+
+ao_smith_comfort_zhu_wo:
+  alias: 主卧舒适模式
+  icon: mdi:home-thermometer
+  sequence:
+    - action: script.ao_smith_room_comfort
+      data:
+        room: climate.zhu_wo
+        cooling_temperature: 26
+        heating_temperature: 22
+
+ao_smith_floor_zhu_wo:
+  alias: 主卧切到地暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.zhu_wo
+      data:
+        preset_mode: 地暖
+
+ao_smith_air_zhu_wo:
+  alias: 主卧切到风暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.zhu_wo
+      data:
+        preset_mode: 风暖
+
+ao_smith_comfort_ci_wo:
+  alias: 次卧舒适模式
+  icon: mdi:home-thermometer
+  sequence:
+    - action: script.ao_smith_room_comfort
+      data:
+        room: climate.ci_wo
+        cooling_temperature: 26
+        heating_temperature: 22
+
+ao_smith_floor_ci_wo:
+  alias: 次卧切到地暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.ci_wo
+      data:
+        preset_mode: 地暖
+
+ao_smith_air_ci_wo:
+  alias: 次卧切到风暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.ci_wo
+      data:
+        preset_mode: 风暖
+
+ao_smith_comfort_shu_fang:
+  alias: 书房舒适模式
+  icon: mdi:home-thermometer
+  sequence:
+    - action: script.ao_smith_room_comfort
+      data:
+        room: climate.shu_fang
+        cooling_temperature: 26
+        heating_temperature: 22
+
+ao_smith_floor_shu_fang:
+  alias: 书房切到地暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.shu_fang
+      data:
+        preset_mode: 地暖
+
+ao_smith_air_shu_fang:
+  alias: 书房切到风暖
+  sequence:
+    - action: climate.set_preset_mode
+      target:
+        entity_id: climate.shu_fang
+      data:
+        preset_mode: 风暖
+
+ao_smith_room_comfort:
+  alias: AO Smith Room Comfort
+  mode: parallel
+  max: 8
+  sequence:
+    - variables:
+        system_mode: "{{ states('select.ao_smith_system_mode') }}"
+    - if:
+        - condition: template
+          value_template: "{{ system_mode not in ['制冷', '采暖'] }}"
+      then:
+        - stop: 请先在全屋总控确认制冷或采暖
+          error: true
+    - action: climate.set_temperature
+      target:
+        entity_id: "{{ room }}"
+      data:
+        hvac_mode: "{{ 'cool' if system_mode == '制冷' else 'heat' }}"
+        temperature: "{{ cooling_temperature if system_mode == '制冷' else heating_temperature }}"

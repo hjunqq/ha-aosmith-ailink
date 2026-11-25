@@ -35,6 +35,7 @@ SYSTEM_MODE_LABELS = {
     0: "制冷",
     1: "采暖",
 }
+SYSTEM_STOPPED = "停机"
 
 THERMOSTAT_MODE_LABELS = {
     0: "制冷",
@@ -47,6 +48,7 @@ THERMOSTAT_MODE_LABELS = {
 }
 
 HEAT_CAPABLE_MODES = {1, 3, 4}
+ROOM_HEATING_OPTIONS = {"地暖": (3, "supFloorWarm"), "风暖": (1, "supWarm")}
 
 WIND_RATE_LABELS = {
     0: "自动",

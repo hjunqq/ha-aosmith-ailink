@@ -28,10 +28,6 @@ def system_thermostat_mode(data: dict[str, Any]) -> int | None:
     return get_main_thermostat(data).get("workModelStatus")
 
 
-def system_is_heating(data: dict[str, Any]) -> bool:
-    return system_thermostat_mode(data) in HEAT_CAPABLE_MODES
-
-
 def system_mode_code(data: dict[str, Any]) -> int | None:
     """Return the normalized whole-home mode: 0 cooling or 1 heating."""
     mode = system_thermostat_mode(data)
@@ -40,34 +36,6 @@ def system_mode_code(data: dict[str, Any]) -> int | None:
     if mode in HEAT_CAPABLE_MODES:
         return 1
     return None
-
-
-async def async_set_system_mode(
-    coordinator,
-    api,
-    thermostat_mode: int,
-    *,
-    power_device_id: str | None = None,
-) -> None:
-    """Set the whole-home mode through the main thermostat, matching AiLink H5."""
-    data = coordinator.data
-    main = get_main_thermostat(data)
-    if not main.get("deviceId"):
-        raise RuntimeError("AO Smith main thermostat is unavailable")
-
-    if thermostat_mode not in (0, 1):
-        raise ValueError(f"Unsupported whole-home mode: {thermostat_mode}")
-
-    # Heating can be reported as raw mode 1, 3, or 4. They are all the same
-    # first-level system mode and must not be rewritten, or the selected heating
-    # strategy could be disturbed.
-    if system_mode_code(data) != thermostat_mode:
-        await api.async_set_thermostat_mode(main["deviceId"], thermostat_mode)
-
-    if power_device_id is not None:
-        await api.async_set_thermostat_power(power_device_id, True)
-
-    await coordinator.async_request_refresh()
 
 
 def get_thermostat(data: dict[str, Any], device_id: str) -> dict[str, Any]:

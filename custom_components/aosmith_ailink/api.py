@@ -165,6 +165,8 @@ def _build_summary(homepage: dict[str, Any]) -> dict[str, Any]:
     thermostats: list[dict[str, Any]] = []
     main_thermostat: dict[str, Any] | None = None
     center: dict[str, Any] | None = None
+    boilers: list[dict[str, Any]] = []
+    heat_pumps: list[dict[str, Any]] = []
 
     for item in devs if isinstance(devs, list) else []:
         si = _parse_status_info(item.get("statusInfo", ""))
@@ -215,6 +217,10 @@ def _build_summary(homepage: dict[str, Any]) -> dict[str, Any]:
             thermostats.append(thermostat)
             if item.get("mainWenKongFlag") == 1:
                 main_thermostat = thermostat
+        elif ptype == "24":
+            boilers.append({key: post.get(key) for key in ("warmStatus", "fireStatus")})
+        elif ptype == "33":
+            heat_pumps.append({key: post.get(key) for key in ("compressorRealFrequency", "workStatus")})
         elif ptype == "37":
             center = {
                 "deviceId": item.get("deviceId"),
@@ -235,6 +241,8 @@ def _build_summary(homepage: dict[str, Any]) -> dict[str, Any]:
         "status": 200,
         "centercontroller": center,
         "mainThermostat": main_thermostat,
+        "boilers": boilers,
+        "heat_pumps": heat_pumps,
         "thermostats": sorted(
             thermostats,
             key=lambda x: (0 if x.get("mainWenKongFlag") == 1 else 1, x.get("roomName") or ""),

@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = build_client(session, entry.data)
     await api.async_validate()
 
-    coordinator = AOSmithDataUpdateCoordinator(hass, api)
+    coordinator = AOSmithDataUpdateCoordinator(hass, api, entry.entry_id)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {

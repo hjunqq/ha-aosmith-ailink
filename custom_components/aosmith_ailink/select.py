@@ -3,6 +3,7 @@ from __future__ import annotations
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -12,9 +13,9 @@ from .const import (
     HEATING_MODE_LABELS,
     SYSTEM_LABEL_TO_MODE,
     SYSTEM_MODE_LABELS,
+    SYSTEM_STOPPED,
 )
 from .entity_helpers import (
-    async_set_system_mode,
     build_center_device_info,
     center_object_id,
     get_main_thermostat,
@@ -39,7 +40,7 @@ class AOSmithSystemModeSelect(CoordinatorEntity, SelectEntity):
     _attr_has_entity_name = False
     _attr_name = "全屋运行模式"
     _attr_unique_id = "aosmith_system_mode"
-    _attr_options = list(SYSTEM_LABEL_TO_MODE.keys())
+    _attr_options = [SYSTEM_STOPPED, *SYSTEM_LABEL_TO_MODE]
 
     def __init__(self, coordinator, api) -> None:
         super().__init__(coordinator)
@@ -47,10 +48,12 @@ class AOSmithSystemModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        return bool(get_main_thermostat(self.coordinator.data))
+        return super().available and bool(get_main_thermostat(self.coordinator.data))
 
     @property
     def current_option(self) -> str | None:
+        if self.coordinator.stopped:
+            return SYSTEM_STOPPED
         mode = system_mode_code(self.coordinator.data)
         return SYSTEM_MODE_LABELS.get(mode)
 
@@ -59,11 +62,10 @@ class AOSmithSystemModeSelect(CoordinatorEntity, SelectEntity):
         return "ao_smith_system_mode"
 
     async def async_select_option(self, option: str) -> None:
-        await async_set_system_mode(
-            self.coordinator,
-            self.api,
-            SYSTEM_LABEL_TO_MODE[option],
-        )
+        if option == SYSTEM_STOPPED:
+            await self.coordinator.async_stop_system()
+        else:
+            await self.coordinator.async_change_system_mode(SYSTEM_LABEL_TO_MODE[option])
 
 
 class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
@@ -84,7 +86,9 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        return bool(self.center)
+        return super().available and bool(self.center) and not self.coordinator.stopped and (
+            system_mode_code(self.coordinator.data) == 1
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -99,10 +103,12 @@ class AOSmithHeatingModeSelect(CoordinatorEntity, SelectEntity):
         return center_object_id("heating_mode")
 
     async def async_select_option(self, option: str) -> None:
-        # This only stores the second-level heating strategy. It does not change
-        # the whole-home mode or power on any room, so it is safe to preset while
-        # the system is cooling.
-        await self.api.async_set_heating_mode(
-            self.center["deviceId"], HEATING_LABEL_TO_MODE[option]
-        )
-        await self.coordinator.async_request_refresh()
+        async with self.coordinator.command_lock:
+            data = await self.coordinator.async_control_snapshot()
+            center = data.get("centercontroller") or {}
+            if self.coordinator.stopped or system_mode_code(data) != 1 or not center.get("deviceId"):
+                raise ServiceValidationError("Heat source selection requires whole-home heating")
+            mode = HEATING_LABEL_TO_MODE[option]
+            if center.get("HeatingMode") != mode:
+                await self.api.async_set_heating_mode(center["deviceId"], mode)
+                await self.coordinator.async_request_refresh()

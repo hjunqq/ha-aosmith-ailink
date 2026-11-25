@@ -3,6 +3,7 @@ from __future__ import annotations
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.percentage import (
@@ -14,7 +15,6 @@ from .const import DOMAIN, WIND_RATE_LABELS
 from .entity_helpers import (
     build_thermostat_device_info,
     get_thermostat,
-    system_is_heating,
     thermostat_common_attributes,
     thermostat_object_id,
 )
@@ -64,7 +64,7 @@ class AOSmithThermostatFanEntity(CoordinatorEntity, FanEntity):
 
     @property
     def available(self) -> bool:
-        return bool(self.thermostat)
+        return super().available and bool(self.thermostat)
 
     @property
     def device_info(self):
@@ -107,43 +107,32 @@ class AOSmithThermostatFanEntity(CoordinatorEntity, FanEntity):
         preset_mode: str | None = None,
         **kwargs,
     ) -> None:
-        if not self.is_on and system_is_heating(self.coordinator.data):
-            return
-        await self.api.async_set_thermostat_power(self.device_id, True)
         if preset_mode:
             await self.async_set_preset_mode(preset_mode)
-            return
-        if percentage and percentage > 0:
+        elif percentage and percentage > 0:
             await self.async_set_percentage(percentage)
-            return
-        await self.coordinator.async_request_refresh()
+
+    async def _async_set_speed(self, rate: int) -> None:
+        async with self.coordinator.command_lock:
+            data = await self.coordinator.async_control_snapshot()
+            if self.coordinator.stopped or get_thermostat(data, self.device_id).get("powerStatus") != 1:
+                raise ServiceValidationError("Start the room thermostat before setting fan speed")
+            await self.api.async_set_thermostat_wind_rate(self.device_id, rate)
+            await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
-        await self.api.async_set_thermostat_power(self.device_id, False)
-        await self.coordinator.async_request_refresh()
+        async with self.coordinator.command_lock:
+            await self.api.async_set_thermostat_power(self.device_id, False)
+            await self.coordinator.async_request_refresh()
 
     async def async_set_percentage(self, percentage: int) -> None:
         if percentage <= 0:
             await self.async_turn_off()
             return
         speed_name = percentage_to_ordered_list_item(MANUAL_SPEEDS, percentage)
-        if not self.is_on and system_is_heating(self.coordinator.data):
-            await self.api.async_set_thermostat_wind_rate(
-                self.device_id, SPEED_TO_RATE[speed_name]
-            )
-            await self.coordinator.async_request_refresh()
-            return
-        await self.api.async_set_thermostat_power(self.device_id, True)
-        await self.api.async_set_thermostat_wind_rate(self.device_id, SPEED_TO_RATE[speed_name])
-        await self.coordinator.async_request_refresh()
+        await self._async_set_speed(SPEED_TO_RATE[speed_name])
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         if preset_mode != AUTO_PRESET:
             return
-        if not self.is_on and system_is_heating(self.coordinator.data):
-            await self.api.async_set_thermostat_wind_rate(self.device_id, 0)
-            await self.coordinator.async_request_refresh()
-            return
-        await self.api.async_set_thermostat_power(self.device_id, True)
-        await self.api.async_set_thermostat_wind_rate(self.device_id, 0)
-        await self.coordinator.async_request_refresh()
+        await self._async_set_speed(0)
